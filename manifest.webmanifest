@@ -1,0 +1,13 @@
+{
+  "name": "tute · contador",
+  "short_name": "tute",
+  "description": "Contador de tute con cartas españolas: partidas, planilla, torneos y reglas.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#ebe4d2",
+  "theme_color": "#ebe4d2",
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}

@@ -1,0 +1,194 @@
+/* ============================================================
+   TUTE · contador — estilos
+   Tokens del NEWRO design system (subset usado por la app).
+   ============================================================ */
+
+/* ---- Webfonts --------------------------------------------- */
+@font-face {
+  font-family: "Mondwest";
+  src: url("../fonts/PPMondwest-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Formula Condensed";
+  src: url("../fonts/FormulaCondensed-Light.otf") format("opentype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Gosha Sans";
+  src: url("../fonts/PPGoshaSans-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ---- Tokens ----------------------------------------------- */
+:root {
+  --red-500: #bf1716;
+  --red-600: #ab0c0c;
+  --red-700: #8c0d0d;
+  --red-400: #d92420;
+
+  --cream-50:  #f4efe3;
+  --cream-100: #ebe4d2;
+  --cream-200: #ded7c6;
+  --cream-300: #cfc7b3;
+
+  --ink-900: #0c0c0c;
+  --ink-800: #141414;
+  --ink-700: #2a2a28;
+  --ink-600: #44443f;
+  --ink-400: #6f6e66;
+
+  --font-display: "Mondwest", "Times New Roman", serif;
+  --font-condensed: "Formula Condensed", "Haettenschweiler", "Arial Narrow", sans-serif;
+  --font-accent: "Gosha Sans", "Helvetica Neue", sans-serif;
+  --font-ui: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+
+  --shadow-sm: 0 1px 2px rgba(20, 20, 20, 0.08);
+  --shadow-hard: 4px 4px 0 var(--ink-800);
+  --shadow-hard-sm: 2px 2px 0 var(--ink-800);
+  --shadow-hard-red: 5px 5px 0 var(--red-500);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 120ms;
+}
+
+/* ---- Base ------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body { margin: 0; height: 100%; }
+
+body {
+  background: var(--cream-100);
+  color: var(--ink-800);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior-y: none;
+}
+
+a { color: var(--red-500); text-decoration: none; }
+a:hover { color: var(--red-700); }
+p { margin: 0; }
+::selection { background: var(--red-500); color: var(--cream-100); }
+
+input::placeholder { color: var(--ink-400); }
+
+/* ---- App shell -------------------------------------------- */
+#app {
+  height: 100dvh;
+  max-width: 480px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background: var(--cream-100);
+  overflow: hidden;
+}
+@media (min-width: 520px) {
+  #app {
+    border-left: 1.5px solid var(--ink-800);
+    border-right: 1.5px solid var(--ink-800);
+  }
+}
+
+.scroll {
+  flex: 1;
+  overflow: auto;
+  padding: calc(28px + env(safe-area-inset-top, 0px)) 20px 20px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.scroll::-webkit-scrollbar { display: none; }
+
+/* ---- Tab bar ---------------------------------------------- */
+.tabbar {
+  display: flex;
+  border-top: 1.5px solid var(--ink-800);
+  background: var(--cream-50);
+  padding: 0 6px calc(8px + env(safe-area-inset-bottom, 0px));
+  flex: none;
+}
+.tabbar button {
+  flex: 1;
+  height: 54px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0;
+}
+.tabbar .bar { width: 20px; height: 3px; transition: background 0.15s var(--ease-out); }
+.tabbar .lbl {
+  font-family: var(--font-accent);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* ---- DS Button (Newro) ------------------------------------ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  padding: 0 20px;
+  width: 100%;
+  font-family: var(--font-accent);
+  font-weight: 400;
+  font-size: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+  white-space: nowrap;
+}
+.btn-primary { background: var(--red-500); color: var(--cream-100); border: 2px solid var(--red-500); }
+.btn-primary:not(:disabled):active { background: var(--red-700); border-color: var(--red-700); transform: translateY(1px); }
+.btn-ink { background: var(--ink-800); color: var(--cream-100); border: 2px solid var(--ink-800); }
+.btn-ink:not(:disabled):active { transform: translateY(1px); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ---- Shared bits ------------------------------------------ */
+.press:active { transform: translateY(1px); }
+
+.name-input {
+  min-width: 0;
+  border: none;
+  border-bottom: 1.5px solid transparent;
+  background: transparent;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  color: var(--ink-800);
+  outline: none;
+  border-radius: 0;
+}
+.name-input:focus { border-bottom-color: var(--red-500) !important; }
+
+.kicker {
+  font-family: var(--font-accent);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+}
+.title {
+  font-family: var(--font-display);
+  font-size: 36px;
+  line-height: 1.05;
+  margin-top: 3px;
+}
