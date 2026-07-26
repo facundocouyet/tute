@@ -43,21 +43,32 @@
     active: initialGame ? ((saved && saved.active) || initialPlayers.map((p, i) => i)) : null,
     sel: initialPlayers.map(() => true),
     t: (saved && saved.t) || null,
+    history: (saved && saved.history) || [],
+    user: null,
     undoStack: [],
     tGamesDraft: 5,
     setupMode: 'libre',
     demoStep: 0,
   };
   let timers = [];
+  let cloudTimer = null;
 
   const app = document.getElementById('app');
 
+  function cloudEnabled() { return !!(window.TuteCloud && window.TuteCloud.enabled); }
+
   function persist() {
-    try {
-      localStorage.setItem(LS_KEY, JSON.stringify({
-        players: state.players, game: state.game, t: state.t, active: state.active,
-      }));
-    } catch (e) {}
+    const payload = {
+      players: state.players, game: state.game, t: state.t, active: state.active,
+      history: state.history,
+    };
+    try { localStorage.setItem(LS_KEY, JSON.stringify(payload)); } catch (e) {}
+    if (state.user && cloudEnabled()) {
+      clearTimeout(cloudTimer);
+      cloudTimer = setTimeout(() => {
+        window.TuteCloud.save(Object.assign({}, payload, { updatedAt: Date.now() }));
+      }, 800);
+    }
   }
 
   function setState(patch) {
@@ -97,7 +108,7 @@
     });
     return { order: idx, rank };
   }
-  function snap() { return JSON.stringify({ game: state.game, t: state.t }); }
+  function snap() { return JSON.stringify({ game: state.game, t: state.t, history: state.history }); }
   function pushUndo(list) { return [...list.slice(-24), snap()]; }
 
   // ---- Acciones --------------------------------------------
@@ -123,25 +134,34 @@
       hist: [...(g.hist || []), { cards, deltas, totals, st: extraTens(g.mano) }],
     });
     let t = state.t;
+    let history = state.history;
     if (next.mano >= s.length) {
       next.phase = 'fin';
+      const { rank } = placements(totals);
       if (t && !g.applied) {
-        const { rank } = placements(totals);
         t = Object.assign({}, t, { points: t.points.map((p, i) => p + rank[i]) });
         next.applied = true;
       }
+      // Registro de la partida terminada para las estadísticas del usuario.
+      history = [...history.slice(-299), {
+        ts: Date.now(),
+        jugadores: actives().map((p) => p.name),
+        totales: totals,
+        puestos: rank,
+        torneo: t ? { partida: t.game, total: t.total } : null,
+      }];
     } else {
       next.phase = 'pedir';
       next.bids = g.bids.map(() => 0);
       next.wons = g.wons.map(() => 0);
     }
-    setState({ game: next, t, undoStack });
+    setState({ game: next, t, history, undoStack });
   }
   function undo() {
     const us = state.undoStack;
     if (!us.length) return;
     const prev = JSON.parse(us[us.length - 1]);
-    setState({ game: prev.game, t: prev.t, undoStack: us.slice(0, -1) });
+    setState({ game: prev.game, t: prev.t, history: prev.history || state.history, undoStack: us.slice(0, -1) });
   }
   function resetMano() {
     const g = state.game;
@@ -327,9 +347,17 @@
       '<div style="font-family: var(--font-condensed); font-size: 96px; line-height: 0.88; color: var(--ink-800);">TUTE</div>' +
       '<div style="font-family: var(--font-accent); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-400); margin-top: 12px;">contador · cartas españolas</div>' +
       '<div style="font-family: var(--font-display); font-size: 19px; color: var(--red-500); margin-top: 26px;">tu jugada.</div>' +
-      '<div style="width: 220px; margin-top: 14px;">' +
-        '<button data-act="enter" class="btn btn-primary">entrar</button>' +
-      '</div>' +
+      (cloudEnabled()
+        ? '<div style="width: 240px; margin-top: 14px; display: flex; flex-direction: column; gap: 8px;">' +
+            '<button data-act="googleLogin" class="btn btn-primary btn-google">' +
+              '<svg width="16" height="16" viewBox="0 0 24 24" style="flex: none;"><path fill="currentColor" d="M21.35 11.1H12v3.2h5.36c-.5 2.3-2.42 3.6-5.36 3.6a5.9 5.9 0 1 1 0-11.8c1.5 0 2.85.52 3.9 1.53l2.36-2.36A9.1 9.1 0 1 0 12 21.1c5.25 0 9.35-3.7 9.35-9.2 0-.27-.02-.54-.05-.8z"/></svg>' +
+              'continuar con google' +
+            '</button>' +
+            '<button data-act="enter" style="height: 40px; border: none; background: none; font-family: var(--font-accent); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-400); cursor: pointer;">entrar sin cuenta</button>' +
+          '</div>'
+        : '<div style="width: 220px; margin-top: 14px;">' +
+            '<button data-act="enter" class="btn btn-primary">entrar</button>' +
+          '</div>') +
     '</div>';
   }
 
@@ -561,6 +589,66 @@
     return '<div class="kicker">' + esc(tKicker) + '</div><div class="title">' + esc(tTitle) + '</div>' + inner;
   }
 
+  function statsHTML() {
+    const h = state.history;
+    if (!h.length) {
+      return '<p style="font-size: 12px; color: var(--ink-400); margin: 10px 0 0; line-height: 1.5;">todavía no terminaste ninguna partida. cuando cierres la última mano se van a guardar acá.</p>';
+    }
+    // Ganadas / jugadas por nombre de jugador.
+    const tally = {};
+    h.forEach((p) => {
+      p.jugadores.forEach((name, i) => {
+        const k = name.trim() || '?';
+        if (!tally[k]) tally[k] = { jugadas: 0, ganadas: 0, puntos: 0 };
+        tally[k].jugadas++;
+        tally[k].puntos += p.totales[i];
+        if (p.puestos[i] === 1) tally[k].ganadas++;
+      });
+    });
+    const rows = Object.keys(tally)
+      .sort((a, b) => tally[b].ganadas - tally[a].ganadas || tally[b].jugadas - tally[a].jugadas)
+      .slice(0, 8)
+      .map((name, i) =>
+        '<div style="display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: ' + (i === 0 ? 'none' : '1px solid var(--cream-200)') + ';">' +
+          '<div style="flex: 1; min-width: 0; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + esc(name) + '</div>' +
+          '<div style="font-family: var(--font-display); font-size: 18px;">' + tally[name].ganadas + '</div>' +
+          '<div style="font-family: var(--font-accent); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-400); width: 62px;">de ' + tally[name].jugadas + '</div>' +
+        '</div>'
+      ).join('');
+    return '<div style="margin-top: 12px;">' +
+      '<div style="font-family: var(--font-accent); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-400); margin-bottom: 2px;">' + h.length + ' partidas jugadas · ganadas</div>' +
+      rows +
+    '</div>';
+  }
+
+  function cuentaHTML() {
+    if (!cloudEnabled()) return '';
+    const u = state.user;
+    if (!u) {
+      return '<div style="border: 1.5px solid var(--ink-800); border-radius: var(--radius-md); background: var(--cream-50); padding: 14px; margin-top: 16px;">' +
+        '<div style="font-family: var(--font-display); font-size: 19px;">tus estadísticas</div>' +
+        '<p style="font-size: 12.5px; color: var(--ink-400); margin: 4px 0 12px; line-height: 1.5;">entrá con google y las partidas quedan guardadas en tu cuenta, no solo en este teléfono.</p>' +
+        '<button data-act="googleLogin" class="btn btn-primary btn-google">' +
+          '<svg width="16" height="16" viewBox="0 0 24 24" style="flex: none;"><path fill="currentColor" d="M21.35 11.1H12v3.2h5.36c-.5 2.3-2.42 3.6-5.36 3.6a5.9 5.9 0 1 1 0-11.8c1.5 0 2.85.52 3.9 1.53l2.36-2.36A9.1 9.1 0 1 0 12 21.1c5.25 0 9.35-3.7 9.35-9.2 0-.27-.02-.54-.05-.8z"/></svg>' +
+          'continuar con google' +
+        '</button>' +
+      '</div>';
+    }
+    const av = u.photo
+      ? '<div style="width: 42px; height: 42px; border-radius: 50%; background: url(\'' + u.photo + '\') center/cover no-repeat; flex: none;"></div>'
+      : '<div style="width: 42px; height: 42px; border-radius: 50%; background: var(--ink-800); color: var(--cream-100); font-family: var(--font-display); font-size: 20px; display: flex; align-items: center; justify-content: center; flex: none;">' + esc((u.name || u.email || '?')[0].toUpperCase()) + '</div>';
+    return '<div style="border: 1.5px solid var(--ink-800); border-radius: var(--radius-md); background: var(--cream-50); padding: 14px; margin-top: 16px; box-shadow: var(--shadow-hard-sm);">' +
+      '<div style="display: flex; align-items: center; gap: 12px;">' + av +
+        '<div style="flex: 1; min-width: 0;">' +
+          '<div style="font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + esc(u.name || 'jugador') + '</div>' +
+          '<div style="font-family: var(--font-accent); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-400); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">organizador</div>' +
+        '</div>' +
+        '<button data-act="googleLogout" style="border: none; background: none; font-family: var(--font-accent); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-400); cursor: pointer; padding: 12px 4px;">salir</button>' +
+      '</div>' +
+      statsHTML() +
+    '</div>';
+  }
+
   function jugadoresHTML() {
     const players = state.players;
     const cards = players.map((p, i) => {
@@ -585,6 +673,7 @@
     return '' +
     '<div class="kicker">jugadores</div>' +
     '<div class="title">la mesa</div>' +
+    cuentaHTML() +
     '<div style="display: flex; flex-direction: column; gap: 10px; margin-top: 16px;">' + cards + '</div>' +
     (players.length < 5
       ? '<button data-act="addPlayer" class="press" style="width: 100%; margin-top: 12px; height: 50px; border: 1.5px dashed var(--ink-400); border-radius: var(--radius-md); background: none; font-family: var(--font-accent); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-800); cursor: pointer;">+ añadir jugador · máx. 5</button>'
@@ -731,6 +820,13 @@
     switch (el.dataset.act) {
       case 'enter': setState({ entered: true }); break;
       case 'logout': setState({ entered: false, tab: 'partida' }); break;
+      case 'googleLogin':
+        el.disabled = true;
+        window.TuteCloud.login().catch(() => { el.disabled = false; render(); });
+        break;
+      case 'googleLogout':
+        window.TuteCloud.logout();
+        break;
       case 'tab': setState({ tab: el.dataset.key }); break;
       case 'selToggle': setState({ sel: state.sel.map((v, j) => j === i ? !v : v) }); break;
       case 'addPlayer': addPlayer(); break;
@@ -772,6 +868,31 @@
   app.addEventListener('change', (e) => {
     const el = e.target;
     if (el.dataset.selfie != null) takeSelfie(+el.dataset.selfie, el);
+  });
+
+  // ---- Nube: sesión de Google -------------------------------
+  window.addEventListener('tute:ready', render);
+
+  window.addEventListener('tute:auth', (e) => {
+    const { user, data } = e.detail;
+    if (!user) { setState({ user: null }); return; }
+    // Al entrar, la partida en curso local pisa a la de la nube solo si
+    // la nube no tiene nada; el historial se une por timestamp.
+    const patch = { user, entered: true };
+    if (data) {
+      const localTs = new Set(state.history.map((h) => h.ts));
+      const merged = [...state.history, ...(data.history || []).filter((h) => !localTs.has(h.ts))]
+        .sort((a, b) => a.ts - b.ts)
+        .slice(-300);
+      patch.history = merged;
+      if (!state.game && data.game) {
+        patch.game = data.game;
+        patch.players = data.players || state.players;
+        patch.active = data.active || null;
+        patch.t = data.t || null;
+      }
+    }
+    setState(patch);
   });
 
   render();

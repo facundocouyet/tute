@@ -165,6 +165,8 @@ input::placeholder { color: var(--ink-400); }
 .btn-ink { background: var(--ink-800); color: var(--cream-100); border: 2px solid var(--ink-800); }
 .btn-ink:not(:disabled):active { transform: translateY(1px); }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+/* Etiqueta larga ("continuar con google"): baja el cuerpo para que entre */
+.btn-google { font-size: 12px; letter-spacing: 0.1em; gap: 9px; padding: 0 12px; }
 
 /* ---- Shared bits ------------------------------------------ */
 .press:active { transform: translateY(1px); }
