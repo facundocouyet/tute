@@ -20,4 +20,11 @@
      appId: "..."
    };
    ============================================================ */
-window.FIREBASE_CONFIG = null;
+window.FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCBUilzEjJLA81WZOTEpdBO6kOKBzvlztA",
+  authDomain: "tute-131c2.firebaseapp.com",
+  projectId: "tute-131c2",
+  storageBucket: "tute-131c2.firebasestorage.app",
+  messagingSenderId: "433223448786",
+  appId: "1:433223448786:web:54f9ea7b198302abad550b",
+};
