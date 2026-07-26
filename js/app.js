@@ -631,7 +631,7 @@
       '<div style="display: flex; gap: 14px; padding: 13px 2px; border-top: 1px solid var(--cream-200);' + (i === 5 ? ' border-bottom: 1px solid var(--cream-200);' : '') + '">' +
         '<div style="font-family: var(--font-display); font-size: 16px; color: var(--red-500); flex: none; width: 22px;">0' + (i + 1) + '</div>' +
         '<div>' +
-          '<div style="font-size: 14px; font-weight: 600;">' + r[0] + '</div>' +
+          '<div style="font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">' + r[0] + '</div>' +
           '<div style="font-size: 12.5px; color: var(--ink-400); line-height: 1.5; margin-top: 2px;">' + r[1] + '</div>' +
         '</div>' +
       '</div>'
