@@ -10,6 +10,8 @@
   const GANADOR = 'más puntos';   // 'más puntos' | 'menos puntos'
   const PUNTOS_BASE = 5;
   const IDA_Y_VUELTA = true;
+  // Puntos que suma cada puesto en el torneo: 1º, 2º, 3º, 4º, 5º.
+  const TORNEO_PTS = [0, 1, 3, 5, 7];
 
   const LS_KEY = 'tute-contador-v1';
 
@@ -108,6 +110,10 @@
     });
     return { order: idx, rank };
   }
+  // Puntos de torneo por puesto: 1º no suma nada y de ahí escala de a dos.
+  function puntosTorneo(puesto) {
+    return TORNEO_PTS[puesto - 1] != null ? TORNEO_PTS[puesto - 1] : TORNEO_PTS[TORNEO_PTS.length - 1];
+  }
   function snap() { return JSON.stringify({ game: state.game, t: state.t, history: state.history }); }
   function pushUndo(list) { return [...list.slice(-24), snap()]; }
 
@@ -139,7 +145,7 @@
       next.phase = 'fin';
       const { rank } = placements(totals);
       if (t && !g.applied) {
-        t = Object.assign({}, t, { points: t.points.map((p, i) => p + rank[i]) });
+        t = Object.assign({}, t, { points: t.points.map((p, i) => p + puntosTorneo(rank[i])) });
         next.applied = true;
       }
       // Registro de la partida terminada para las estadísticas del usuario.
@@ -465,7 +471,7 @@
 
     const { order, rank } = ctx.placement;
     const ranking = order.map((pi) => {
-      const tp = (t && fin) ? '+' + rank[pi] + ' pt torneo' : '';
+      const tp = (t && fin) ? '+' + puntosTorneo(rank[pi]) + ' pt torneo' : '';
       return '<div style="display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--ink-600);">' +
         '<div style="font-family: var(--font-display); font-size: 16px; color: var(--red-400); width: 24px; flex: none;">' + rank[pi] + 'º</div>' +
         avatar(activesArr[pi], 24, 12, ' border: 1px solid var(--ink-600);') +
@@ -582,7 +588,7 @@
     if (!t) {
       inner = '<div style="border: 1.5px solid var(--ink-800); border-radius: var(--radius-md); background: var(--cream-50); padding: 18px 16px; box-shadow: var(--shadow-hard-sm); margin-top: 16px;">' +
         '<p style="font-size: 13px; line-height: 1.55; color: var(--ink-800); margin: 0 0 8px;">el torneo se arma al iniciar una partida: elegís quiénes juegan, marcás "torneo" y cuántas partidas.</p>' +
-        '<p style="font-size: 12.5px; line-height: 1.5; color: var(--ink-400); margin: 0 0 16px;">cada partida reparte puntos según el puesto: el 1º suma 1, el 2º suma 2… gana el torneo quien menos puntos junta.</p>' +
+        '<p style="font-size: 12.5px; line-height: 1.5; color: var(--ink-400); margin: 0 0 16px;">cada partida reparte puntos según el puesto: el 1º no suma nada, el 2º suma 1, el 3º suma 3, el 4º suma 5 y el 5º suma 7. gana el torneo quien menos puntos junta.</p>' +
         (!g0
           ? '<button data-act="goSetupTorneo" class="btn btn-primary">armar torneo</button>'
           : '<p style="font-size: 12px; color: var(--red-500); margin: 0; line-height: 1.5;">hay una partida en curso: terminala (o reiniciala) antes de armar un torneo.</p>') +
@@ -605,42 +611,96 @@
         '<div style="position: absolute; top: 0; bottom: 0; left: 0; width: ' + Math.round(played / t.total * 100) + '%; background: var(--red-500); transition: width 0.4s var(--ease-out);"></div>' +
       '</div>' +
       '<div style="border: 1.5px solid var(--ink-800); border-radius: var(--radius-md); background: var(--cream-50); box-shadow: var(--shadow-hard-sm); overflow: hidden;">' + rows + '</div>' +
-      '<p style="font-size: 11.5px; color: var(--ink-400); margin: 12px 2px 0; line-height: 1.5;">se suma el puesto de cada partida · menos puntos = mejor puesto.</p>' +
+      '<p style="font-size: 11.5px; color: var(--ink-400); margin: 12px 2px 0; line-height: 1.5;">por partida: 1º 0 · 2º 1 · 3º 3 · 4º 5 · 5º 7 — menos puntos = mejor puesto.</p>' +
       '<button data-act="endTournament" class="press" style="width: 100%; margin-top: 14px; height: 44px; border: 1.5px solid var(--ink-800); border-radius: var(--radius-sm); background: transparent; font-family: var(--font-accent); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-800); cursor: pointer;">' + (tDone ? 'cerrar torneo' : 'terminar torneo') + '</button>';
     }
     return '<div class="kicker">' + esc(tKicker) + '</div><div class="title">' + esc(tTitle) + '</div>' + inner;
   }
 
+  // Acumulado por nombre de jugador sobre todas las partidas terminadas.
+  function tally() {
+    const t = {};
+    state.history.forEach((p) => {
+      p.jugadores.forEach((name, i) => {
+        const k = (name || '').trim() || '?';
+        if (!t[k]) t[k] = { jugadas: 0, ganadas: 0, podios: 0, ultimos: 0, puntos: 0, mejor: null };
+        const r = t[k];
+        r.jugadas++;
+        r.puntos += p.totales[i];
+        if (p.puestos[i] === 1) r.ganadas++;
+        if (p.puestos[i] <= 2) r.podios++;
+        if (p.puestos[i] === p.jugadores.length) r.ultimos++;
+        if (r.mejor == null || p.totales[i] > r.mejor) r.mejor = p.totales[i];
+      });
+    });
+    return t;
+  }
+
+  function statTile(valor, etiqueta) {
+    return '<div style="flex: 1; min-width: 0; text-align: center; padding: 12px 4px;">' +
+      '<div style="font-family: var(--font-display); font-size: 30px; line-height: 1;">' + valor + '</div>' +
+      '<div style="font-family: var(--font-accent); font-size: 8.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-400); margin-top: 4px;">' + etiqueta + '</div>' +
+    '</div>';
+  }
+
   function statsHTML() {
     const h = state.history;
     if (!h.length) {
-      return '<p style="font-size: 12px; color: var(--ink-400); margin: 10px 0 0; line-height: 1.5;">todavía no terminaste ninguna partida. cuando cierres la última mano se van a guardar acá.</p>';
+      return '<div style="border: 1.5px dashed var(--ink-400); border-radius: var(--radius-md); padding: 18px 16px; margin-top: 16px;">' +
+        '<div style="font-family: var(--font-display); font-size: 20px;">todavía no hay números</div>' +
+        '<p style="font-size: 12.5px; color: var(--ink-400); margin-top: 6px; line-height: 1.5;">cuando cierres la última mano de una partida, queda guardada acá: quién ganó, los puntos de cada uno y el historial completo.</p>' +
+      '</div>';
     }
-    // Ganadas / jugadas por nombre de jugador.
-    const tally = {};
-    h.forEach((p) => {
-      p.jugadores.forEach((name, i) => {
-        const k = name.trim() || '?';
-        if (!tally[k]) tally[k] = { jugadas: 0, ganadas: 0, puntos: 0 };
-        tally[k].jugadas++;
-        tally[k].puntos += p.totales[i];
-        if (p.puestos[i] === 1) tally[k].ganadas++;
-      });
-    });
-    const rows = Object.keys(tally)
-      .sort((a, b) => tally[b].ganadas - tally[a].ganadas || tally[b].jugadas - tally[a].jugadas)
-      .slice(0, 8)
-      .map((name, i) =>
-        '<div style="display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: ' + (i === 0 ? 'none' : '1px solid var(--cream-200)') + ';">' +
-          '<div style="flex: 1; min-width: 0; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + esc(name) + '</div>' +
-          '<div style="font-family: var(--font-display); font-size: 18px;">' + tally[name].ganadas + '</div>' +
-          '<div style="font-family: var(--font-accent); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-400); width: 62px;">de ' + tally[name].jugadas + '</div>' +
-        '</div>'
-      ).join('');
-    return '<div style="margin-top: 12px;">' +
-      '<div style="font-family: var(--font-accent); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-400); margin-bottom: 2px;">' + h.length + ' partidas jugadas · ganadas</div>' +
-      rows +
-    '</div>';
+    const t = tally();
+    const nombres = Object.keys(t);
+    const torneos = h.filter((p) => p.torneo).length;
+    const totalJugadores = h.reduce((a, p) => a + p.jugadores.length, 0);
+
+    // Ranking: primero por partidas ganadas, después por porcentaje.
+    const rows = nombres
+      .sort((a, b) => t[b].ganadas - t[a].ganadas || (t[b].ganadas / t[b].jugadas) - (t[a].ganadas / t[a].jugadas) || t[b].jugadas - t[a].jugadas)
+      .map((name, i) => {
+        const r = t[name];
+        const pct = Math.round(r.ganadas / r.jugadas * 100);
+        return '<div style="display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-top: ' + (i === 0 ? 'none' : '1px solid var(--cream-200)') + '; background: ' + (i === 0 ? 'rgba(191, 23, 22, 0.05)' : 'transparent') + ';">' +
+          '<div style="font-family: var(--font-display); font-size: 17px; width: 24px; flex: none; color: ' + (i === 0 ? 'var(--red-500)' : 'var(--ink-800)') + ';">' + (i + 1) + 'º</div>' +
+          '<div style="flex: 1; min-width: 0;">' +
+            '<div style="font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + esc(name) + '</div>' +
+            '<div style="font-family: var(--font-accent); font-size: 8.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-400); margin-top: 2px;">' + r.jugadas + ' jugadas · mejor ' + r.mejor + ' pts</div>' +
+          '</div>' +
+          '<div style="text-align: right; flex: none;">' +
+            '<div style="font-family: var(--font-display); font-size: 20px; line-height: 1;">' + r.ganadas + '</div>' +
+            '<div style="font-family: var(--font-accent); font-size: 8.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-400); margin-top: 2px;">' + pct + '%</div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+
+    // Últimas partidas, de la más reciente a la más vieja.
+    const ultimas = h.slice(-6).reverse().map((p, i) => {
+      const gi = p.puestos.indexOf(1);
+      const fecha = new Date(p.ts);
+      const dd = String(fecha.getDate()).padStart(2, '0') + '/' + String(fecha.getMonth() + 1).padStart(2, '0');
+      return '<div style="display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-top: ' + (i === 0 ? 'none' : '1px solid var(--cream-200)') + ';">' +
+        '<div style="font-family: var(--font-accent); font-size: 9px; letter-spacing: 0.08em; color: var(--ink-400); width: 38px; flex: none;">' + dd + '</div>' +
+        '<div style="flex: 1; min-width: 0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">ganó <strong>' + esc(p.jugadores[gi] || '?') + '</strong>' + (p.torneo ? ' · torneo' : '') + '</div>' +
+        '<div style="font-family: var(--font-display); font-size: 16px; flex: none;">' + (p.totales[gi] != null ? p.totales[gi] : '') + '</div>' +
+      '</div>';
+    }).join('');
+
+    return '' +
+    '<div style="display: flex; border: 1.5px solid var(--ink-800); border-radius: var(--radius-md); background: var(--cream-50); box-shadow: var(--shadow-hard-sm); overflow: hidden; margin-top: 16px;">' +
+      statTile(h.length, 'partidas') +
+      '<div style="width: 1px; background: var(--cream-200);"></div>' +
+      statTile(torneos, 'de torneo') +
+      '<div style="width: 1px; background: var(--cream-200);"></div>' +
+      statTile(nombres.length, 'jugadores') +
+      '<div style="width: 1px; background: var(--cream-200);"></div>' +
+      statTile(Math.round(totalJugadores / h.length * 10) / 10, 'en la mesa') +
+    '</div>' +
+    '<div class="kicker" style="margin: 20px 2px 6px;">quién gana más</div>' +
+    '<div style="border: 1.5px solid var(--ink-800); border-radius: var(--radius-md); background: var(--cream-50); overflow: hidden;">' + rows + '</div>' +
+    '<div class="kicker" style="margin: 20px 2px 6px;">últimas partidas</div>' +
+    '<div style="border: 1.5px solid var(--ink-800); border-radius: var(--radius-md); background: var(--cream-50); overflow: hidden;">' + ultimas + '</div>';
   }
 
   function cuentaHTML() {
@@ -657,18 +717,31 @@
       '</div>';
     }
     const av = u.photo
-      ? '<div style="width: 42px; height: 42px; border-radius: 50%; background: url(\'' + u.photo + '\') center/cover no-repeat; flex: none;"></div>'
-      : '<div style="width: 42px; height: 42px; border-radius: 50%; background: var(--ink-800); color: var(--cream-100); font-family: var(--font-display); font-size: 20px; display: flex; align-items: center; justify-content: center; flex: none;">' + esc((u.name || u.email || '?')[0].toUpperCase()) + '</div>';
+      ? '<div style="width: 46px; height: 46px; border-radius: 50%; background: url(\'' + u.photo + '\') center/cover no-repeat; flex: none;"></div>'
+      : '<div style="width: 46px; height: 46px; border-radius: 50%; background: var(--ink-800); color: var(--cream-100); font-family: var(--font-display); font-size: 22px; display: flex; align-items: center; justify-content: center; flex: none;">' + esc((u.name || u.email || '?')[0].toUpperCase()) + '</div>';
     return '<div style="border: 1.5px solid var(--ink-800); border-radius: var(--radius-md); background: var(--cream-50); padding: 14px; margin-top: 16px; box-shadow: var(--shadow-hard-sm);">' +
       '<div style="display: flex; align-items: center; gap: 12px;">' + av +
         '<div style="flex: 1; min-width: 0;">' +
           '<div style="font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + esc(u.name || 'jugador') + '</div>' +
-          '<div style="font-family: var(--font-accent); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-400); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">organizador</div>' +
+          '<div style="font-size: 11.5px; color: var(--ink-400); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + esc(u.email || '') + '</div>' +
+          '<div style="font-family: var(--font-accent); font-size: 8.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--red-500); margin-top: 4px;">organizador · se guarda en tu cuenta</div>' +
         '</div>' +
         '<button data-act="googleLogout" style="border: none; background: none; font-family: var(--font-accent); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-400); cursor: pointer; padding: 12px 4px;">salir</button>' +
       '</div>' +
-      statsHTML() +
     '</div>';
+  }
+
+  function perfilHTML() {
+    const u = state.user;
+    return '' +
+    '<div class="kicker">' + (u ? 'tu cuenta' : 'estadísticas') + '</div>' +
+    '<div class="title">' + (u ? esc((u.name || 'jugador').split(' ')[0].toLowerCase()) : 'los números') + '</div>' +
+    cuentaHTML() +
+    (!cloudEnabled()
+      ? '<p style="font-size: 11.5px; color: var(--ink-400); margin: 14px 2px 0; line-height: 1.5;">las partidas se guardan solo en este dispositivo.</p>'
+      : '') +
+    statsHTML() +
+    '<p style="font-size: 11px; color: var(--ink-400); margin: 14px 2px 0; line-height: 1.5;">se cuentan las partidas terminadas · los jugadores se agrupan por nombre.</p>';
   }
 
   function jugadoresHTML() {
@@ -695,7 +768,6 @@
     return '' +
     '<div class="kicker">jugadores</div>' +
     '<div class="title">la mesa</div>' +
-    cuentaHTML() +
     '<div style="display: flex; flex-direction: column; gap: 10px; margin-top: 16px;">' + cards + '</div>' +
     (players.length < 5
       ? '<button data-act="addPlayer" class="press" style="width: 100%; margin-top: 12px; height: 50px; border: 1.5px dashed var(--ink-400); border-radius: var(--radius-md); background: none; font-family: var(--font-accent); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-800); cursor: pointer;">+ añadir jugador · máx. 5</button>'
@@ -737,7 +809,7 @@
       ['la puntuación', 'si cumplís lo pedido sumás 5 puntos más 1 por cada carta ganada. si fallás, restás la diferencia entre lo pedido y lo ganado.'],
       ['el triunfo', 'el mazo queda con una carta dada vuelta: ese palo es el triunfo. si no tenés el palo que se juega, tenés que fallar con triunfo; el que sigue solo está obligado a tirar triunfo si tiene uno que mate al que está en la mesa.'],
       ['el valor de las cartas', 'de mayor a menor: 1, 3, 12 (rey), 11 (caballo), 10 (sota), 7, 6, 5, 4 y 2.'],
-      ['el torneo', 'tu puesto en cada partida son tus puntos de torneo. el que menos puntos junta va primero.'],
+      ['el torneo', 'cada partida suma puntos según tu puesto: 1º suma 0, 2º suma 1, 3º suma 3, 4º suma 5 y 5º suma 7. el que menos puntos junta va primero.'],
     ].map((r, i) =>
       '<div style="display: flex; gap: 14px; padding: 13px 2px; border-top: 1px solid var(--cream-200);' + (i === 5 ? ' border-bottom: 1px solid var(--cream-200);' : '') + '">' +
         '<div style="font-family: var(--font-display); font-size: 16px; color: var(--red-500); flex: none; width: 22px;">0' + (i + 1) + '</div>' +
@@ -769,8 +841,9 @@
       { key: 'partida', label: 'partida' },
       { key: 'planilla', label: 'planilla' },
       { key: 'torneo', label: 'torneo' },
-      { key: 'jugadores', label: 'jugadores' },
+      { key: 'jugadores', label: 'mesa' },
       { key: 'reglas', label: 'reglas' },
+      { key: 'perfil', label: 'perfil' },
     ];
     return '<div class="tabbar">' + defs.map((d) => {
       const on = state.tab === d.key;
@@ -817,6 +890,7 @@
     else if (state.tab === 'torneo') content = torneoHTML(ctx);
     else if (state.tab === 'jugadores') content = jugadoresHTML();
     else if (state.tab === 'reglas') content = reglasHTML();
+    else if (state.tab === 'perfil') content = perfilHTML();
 
     app.innerHTML =
       (state.entered ? '' : loginHTML()) +
