@@ -181,6 +181,17 @@
     const free = PALETTE.find((sw) => !used.includes(sw.c)) || PALETTE[0];
     resetTable([...players, { name: 'Jugador ' + (players.length + 1), color: free.c }]);
   }
+  // Reordena la mesa: jugador y su tilde se mueven juntos.
+  function movePlayer(i, d) {
+    const j = i + d;
+    const players = state.players;
+    if (j < 0 || j >= players.length) return;
+    const sel = state.sel || players.map(() => true);
+    const np = players.slice(), ns = sel.slice();
+    [np[i], np[j]] = [np[j], np[i]];
+    [ns[i], ns[j]] = [ns[j], ns[i]];
+    setState({ players: np, sel: ns });
+  }
   function startPartida() {
     const sel = state.sel || state.players.map(() => true);
     const idx = sel.map((v, i) => v ? i : -1).filter((i) => i >= 0);
@@ -364,11 +375,21 @@
   function setupHTML(ctx) {
     const { sel, players } = ctx;
     const selCount = sel.filter(Boolean).length;
+    const moveBtn = (act, i, glyph, label, off) =>
+      '<button data-act="' + act + '" data-i="' + i + '" aria-label="' + label + '"' + (off ? ' disabled' : '') +
+        ' style="width: 30px; height: 24px; border: none; background: none; padding: 0; cursor: ' + (off ? 'default' : 'pointer') +
+        '; color: ' + (off ? 'var(--cream-300)' : 'var(--ink-800)') + '; display: flex; align-items: center; justify-content: center;">' +
+        '<svg width="13" height="9" viewBox="0 0 13 9" style="pointer-events: none;"><path d="' + glyph + '" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+      '</button>';
     const rows = players.map((p, i) =>
-      '<div style="display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 14px; border-top: ' + (i === 0 ? 'none' : '1px solid var(--cream-200)') + '; opacity: ' + (sel[i] ? 1 : 0.55) + ';">' +
+      '<div style="display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 12px; border-top: ' + (i === 0 ? 'none' : '1px solid var(--cream-200)') + '; opacity: ' + (sel[i] ? 1 : 0.55) + ';">' +
+        '<div style="display: flex; flex-direction: column; flex: none;">' +
+          moveBtn('moveUp', i, 'M1.5 7 6.5 2l5 5', 'subir', i === 0) +
+          moveBtn('moveDown', i, 'M1.5 2 6.5 7l5-5', 'bajar', i === players.length - 1) +
+        '</div>' +
         avatar(p, 34, 16) +
         '<input id="sel-name-' + i + '" data-rename="' + i + '" value="' + esc(p.name) + '" placeholder="nombre" class="name-input" style="flex: 1; font-size: 15px; padding: 8px 2px;">' +
-        '<button data-act="selToggle" data-i="' + i + '" aria-label="juega" style="width: 44px; height: 44px; border: none; background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; flex: none;">' +
+        '<button data-act="selToggle" data-i="' + i + '" aria-label="juega" style="width: 42px; height: 44px; border: none; background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; flex: none;">' +
           '<div style="width: 26px; height: 26px; border-radius: 6px; border: 1.5px solid var(--ink-800); background: ' + (sel[i] ? 'var(--ink-800)' : 'transparent') + '; display: flex; align-items: center; justify-content: center; color: var(--cream-100); font-size: 14px; pointer-events: none;">' + (sel[i] ? '✓' : '') + '</div>' +
         '</button>' +
       '</div>'
@@ -378,6 +399,7 @@
     '<div class="kicker">' + (isTorneo ? 'nuevo torneo' : 'nueva partida') + '</div>' +
     '<div class="title">¿quiénes juegan?</div>' +
     '<div style="border: 1.5px solid var(--ink-800); border-radius: var(--radius-md); background: var(--cream-50); box-shadow: var(--shadow-hard-sm); overflow: hidden; margin-top: 16px;">' + rows + '</div>' +
+    '<p style="font-size: 11.5px; color: var(--ink-400); margin: 8px 2px 0; line-height: 1.45;">con las flechas los ordenás como están sentados en la mesa.</p>' +
     (players.length < 5
       ? '<button data-act="addPlayer" class="press" style="width: 100%; margin-top: 10px; height: 46px; border: 1.5px dashed var(--ink-400); border-radius: var(--radius-md); background: none; font-family: var(--font-accent); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-800); cursor: pointer;">+ añadir jugador</button>'
       : '') +
@@ -829,6 +851,8 @@
         break;
       case 'tab': setState({ tab: el.dataset.key }); break;
       case 'selToggle': setState({ sel: state.sel.map((v, j) => j === i ? !v : v) }); break;
+      case 'moveUp': movePlayer(i, -1); break;
+      case 'moveDown': movePlayer(i, 1); break;
       case 'addPlayer': addPlayer(); break;
       case 'modeLibre': setState({ setupMode: 'libre' }); break;
       case 'modeTorneo': setState({ setupMode: 'torneo' }); break;
