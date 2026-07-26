@@ -13,12 +13,13 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="stylesheet" href="css/styles.css">
+<!-- ?v= : subir este número en cada cambio para que el celular no sirva la versión vieja del caché -->
+<link rel="stylesheet" href="css/styles.css?v=2">
 </head>
 <body>
 <div id="app"></div>
-<script src="firebase-config.js"></script>
-<script type="module" src="js/cloud.js"></script>
-<script src="js/app.js"></script>
+<script src="firebase-config.js?v=2"></script>
+<script type="module" src="js/cloud.js?v=2"></script>
+<script src="js/app.js?v=2"></script>
 </body>
 </html>
