@@ -84,6 +84,9 @@ input::placeholder { color: var(--ink-400); }
 
 /* ---- App shell -------------------------------------------- */
 #app {
+  /* Fallback en cadena para Safari iOS: % del viewport chico si no hay dvh */
+  height: 100%;
+  height: -webkit-fill-available;
   height: 100dvh;
   max-width: 480px;
   margin: 0 auto;
