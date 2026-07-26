@@ -639,7 +639,8 @@
     return '' +
     '<div class="kicker">reglas</div>' +
     '<div class="title">cómo se juega</div>' +
-    '<div style="border: 1.5px solid var(--ink-800); border-radius: var(--radius-md); background: var(--cream-50); box-shadow: var(--shadow-hard-sm); padding: 16px; margin-top: 16px;">' +
+    '<div style="display: flex; flex-direction: column; margin-top: 8px;">' + rules + '</div>' +
+    '<div style="border: 1.5px solid var(--ink-800); border-radius: var(--radius-md); background: var(--cream-50); box-shadow: var(--shadow-hard-sm); padding: 16px; margin-top: 18px;">' +
       '<div style="font-family: var(--font-display); font-size: 20px;">la mano fallada</div>' +
       '<div id="demo-root" style="position: relative; width: 300px; height: 278px; margin: 0 auto;">' +
         '<div style="position: absolute; left: 50%; top: 50%; width: 178px; height: 178px; transform: translate(-50%, -50%); border-radius: 50%; border: 2px solid var(--ink-800); background: var(--cream-100);"></div>' +
@@ -649,7 +650,6 @@
       '<div id="demo-caption" style="min-height: 36px; font-size: 12.5px; line-height: 1.45; color: var(--ink-400); text-align: center; margin-bottom: 12px;">' + esc(d.caption) + '</div>' +
       '<button id="demo-btn" data-act="playDemo" class="btn btn-ink">' + d.btnLabel + '</button>' +
     '</div>' +
-    '<div style="display: flex; flex-direction: column; margin-top: 18px;">' + rules + '</div>' +
     '<p style="font-size: 11px; color: var(--ink-400); margin: 14px 2px 0;">próximamente: más reglas animadas sobre la mesa.</p>';
   }
 
